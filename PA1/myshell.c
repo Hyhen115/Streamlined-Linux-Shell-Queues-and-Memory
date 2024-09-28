@@ -130,10 +130,87 @@ void process_cmd(char *command_line)
 
     //TODO feature 3: File Redirection
     //Phrase the command line
-    int TokenCount;
-    
-    
-    
+    char *pipeSegments[MAX_PIPE_SEGMENTS]; // character array buffer to store the pipe segements
+    char *arguments[MAX_ARGUMENTS_PER_SEGMENT]; // character array buffer to store the arguments
+    int argumentsCount;
+    int pipeSegmentsCount;
+    int redirectionsCount;
+
+    //phrase the command line
+
+    //split the command line by pipe
+    read_tokens(pipeSegments, command_line, &pipeSegmentsCount, PIPE_CHAR);
+    pipeSegments[pipeSegmentsCount] = NULL;
+
+    //for each pipe segment split with space
+    for(int i = 0; i < pipeSegmentsCount; ++i)
+    {
+        //split the pipe segment with space -> get the arguments
+        read_tokens(arguments, pipeSegments[i], &argumentsCount, SPACE_CHARS);
+        arguments[argumentsCount] = NULL;
+
+        //search for the redirections
+        for(int j = 0; j < argumentsCount; ++j)
+        {
+            //input redirection
+            if(strcmp(arguments[j], "<") == 0)
+            {
+                //read the file
+                int fdInput = open(arguments[j + 1], O_RDONLY);
+
+                //check successfull or not
+                if (fdInput == -1)
+                {
+                    printf("Error: Cannot open the file %s\n", arguments[j + 1]);
+                    exit(1);
+                }
+
+                //redirect the file to the standard input
+                dup2(fdInput, STDIN_FILENO);
+                close(fdInput);
+                //! no fin yet ==================
+
+                //remove '<'
+                arguments[j] = NULL;
+            }
+            
+            //output redirection
+            else if(strcmp(arguments[j], ">") == 0)
+            {
+                //write the file
+                int fdOutput = open(arguments[j + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                
+                //check successfull or not
+                if(fdOutput == -1)
+                {
+                    printf("Error: Cannot open the file %s\n", arguments[j + 1]);
+                    exit(1);
+                }
+
+                //redirect the file to the standard output
+                dup2(fdOutput, STDOUT_FILENO);
+                close(fdOutput);
+                //! no fin yet ==================
+
+                //remove '>'
+                arguments[j] = NULL;
+
+            }
+        }
+        
+        //execute the command
+        //since (</>) has been become null
+        //argv argv ... NULL... file names ... NULL... filenames
+        //the execvp only detect the argvs and end before the file names
+        execvp(arguments[0], arguments);
+        
+        //execvp fails
+        printf("execvp fails\n");
+        exit(1);
+    }
+
+
+
 }
 
 // TODO feature 2: Ctrl-C (SIGINT) handling
