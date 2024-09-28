@@ -128,89 +128,155 @@ void process_cmd(char *command_line)
     // Please remember to remove this line before the submission
     // printf("Debug: The command line is [%s]\n", command_line);
 
-    //TODO feature 3: File Redirection
-    //Phrase the command line
-    char *pipeSegments[MAX_PIPE_SEGMENTS]; // character array buffer to store the pipe segements
+    // TODO feature 4: Multi-level Pipe
+    // Phrase the command line
+    char *pipeSegments[MAX_PIPE_SEGMENTS];      // character array buffer to store the pipe segements
     char *arguments[MAX_ARGUMENTS_PER_SEGMENT]; // character array buffer to store the arguments
     int argumentsCount;
     int pipeSegmentsCount;
     int redirectionsCount;
 
-    //phrase the command line
+    // phrase the command line
 
-    //split the command line by pipe
+    // split the command line by pipe
     read_tokens(pipeSegments, command_line, &pipeSegmentsCount, PIPE_CHAR);
     pipeSegments[pipeSegmentsCount] = NULL;
 
-    //for each pipe segment split with space
-    for(int i = 0; i < pipeSegmentsCount; ++i)
+    // create a pipe
+    // cmd0 -> cmd1 -> cmd2 -> cmd3 -> cmd4 -> cmd5 -> cmd6 -> cmd7 (8 pipes segments)
+    //     pipe0   pipe1   pipe2   pipe3   pipe4   pipe5   pipe6 (7 pipes)
+    int pipefd[pipeSegmentsCount - 1][2];
+    // link and set up 7 pipes using a 2d array
+    //[0,0] [0,1] (pipe 0)
+    //[1,0] [1,1] (pipe 1)
+    //[2,0] [2,1] (pipe 2)
+    //[3,0] [3,1] (pipe 3)
+    //[4,0] [4,1] (pipe 4)
+    //[5,0] [5,1] (pipe 5)
+    //[6,0] [6,1] (pipe 6)
+    for (int i = 0; i < pipeSegmentsCount - 1; ++i)
     {
-        //split the pipe segment with space -> get the arguments
+        if (pipe(pipefd[i]) < 0)
+        {
+            printf("pipe fails\n");
+            exit(1);
+        }
+    }
+
+    // for each pipe segment split with space
+    for (int i = 0; i < pipeSegmentsCount; ++i)
+    {
+        // split the pipe segment with space -> get the arguments
         read_tokens(arguments, pipeSegments[i], &argumentsCount, SPACE_CHARS);
         arguments[argumentsCount] = NULL;
 
-        //search for the redirections
-        for(int j = 0; j < argumentsCount; ++j)
-        {
-            //input redirection
-            if(strcmp(arguments[j], "<") == 0)
-            {
-                //read the file
-                int fdInput = open(arguments[j + 1], O_RDONLY);
+        // fork a child process
+        pid_t pid = fork();
 
-                //check successfull or not
-                if (fdInput == -1)
+        if (pid < 0)
+        {
+            // fork fails
+            printf("fork fails\n");
+            exit(1);
+        }
+        else if (pid == 0)
+        {
+            // child process
+
+            // setup the redirections for pipes
+            // if not the first pipe segment
+            if (i != 0)
+            {
+                // redirect the standard input to the previous pipes
+                dup2(pipefd[i - 1][0], STDIN_FILENO); // redirect the previous pipe read end to stdin
+                //after the dup2, the original file descripter no longer needed
+                //=> close both end of the previous pipe
+                close(pipefd[i - 1][0]);
+                close(pipefd[i - 1][1]);
+                
+            }
+
+            // if not the last pipe segment
+            if (i != pipeSegmentsCount - 1)
+            {
+                // redirect the standard output to the next pipe
+                dup2(pipefd[i][1], STDOUT_FILENO); // redirect the next pipe write end to stdout
+                // after dup2, original file descripter no longer needed
+                // => close both end of the next pipe
+                close(pipefd[i][0]);
+                close(pipefd[i][1]);
+            }
+
+            // TODO: feature 3: File Redirection
+            for (int j = 0; j < argumentsCount; ++j)
+            {
+                // input redirection
+                if (strcmp(arguments[j], "<") == 0)
                 {
-                    printf("Error: Cannot open the file %s\n", arguments[j + 1]);
-                    exit(1);
+                    // read the file
+                    int fdInput = open(arguments[j + 1], O_RDONLY);
+
+                    // check successfull or not
+                    if (fdInput == -1)
+                    {
+                        printf("Error: Cannot open the file %s\n", arguments[j + 1]);
+                        exit(1);
+                    }
+
+                    // redirect the file to the standard input
+                    dup2(fdInput, STDIN_FILENO);
+                    close(fdInput);
+
+                    // remove '<'
+                    arguments[j] = NULL;
                 }
 
-                //redirect the file to the standard input
-                dup2(fdInput, STDIN_FILENO);
-                close(fdInput);
-                //! no fin yet ==================
+                // output redirection
+                else if (strcmp(arguments[j], ">") == 0)
+                {
+                    // write the file
+                    int fdOutput = open(arguments[j + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
-                //remove '<'
-                arguments[j] = NULL;
+                    // check successfull or not
+                    if (fdOutput == -1)
+                    {
+                        printf("Error: Cannot open the file %s\n", arguments[j + 1]);
+                        exit(1);
+                    }
+
+                    // redirect the file to the standard output
+                    dup2(fdOutput, STDOUT_FILENO);
+                    close(fdOutput);
+
+                    // remove '>'
+                    arguments[j] = NULL;
+                }
+            }
+
+            // execute the command
+            // since (</>) has been become null
+            // argv argv ... NULL... file names ... NULL... filenames
+            // the execvp only detect the argvs and end before the file names
+            execvp(arguments[0], arguments);
+
+            // execvp fails
+            printf("execvp fails\n");
+            exit(1);
+        }
+        else
+        {
+            // parent process
+            // close the unused pipe
+            if (i != 0)
+            {
+                close(pipefd[i - 1][0]); //close read end of previous pipe
+                close(pipefd[i - 1][1]); //close write end of previous pipe
             }
             
-            //output redirection
-            else if(strcmp(arguments[j], ">") == 0)
-            {
-                //write the file
-                int fdOutput = open(arguments[j + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
-                
-                //check successfull or not
-                if(fdOutput == -1)
-                {
-                    printf("Error: Cannot open the file %s\n", arguments[j + 1]);
-                    exit(1);
-                }
-
-                //redirect the file to the standard output
-                dup2(fdOutput, STDOUT_FILENO);
-                close(fdOutput);
-                //! no fin yet ==================
-
-                //remove '>'
-                arguments[j] = NULL;
-
-            }
+            // wait for the child process
+            wait(0);
         }
-        
-        //execute the command
-        //since (</>) has been become null
-        //argv argv ... NULL... file names ... NULL... filenames
-        //the execvp only detect the argvs and end before the file names
-        execvp(arguments[0], arguments);
-        
-        //execvp fails
-        printf("execvp fails\n");
-        exit(1);
     }
-
-
-
 }
 
 // TODO feature 2: Ctrl-C (SIGINT) handling
@@ -218,7 +284,7 @@ void sigint_handler(int sig)
 {
     // print the terminate message
     printf(TEMPLATE_MYSHELL_TERMINATE, getpid());
-    //terminate the program
+    // terminate the program
     exit(0);
 }
 
