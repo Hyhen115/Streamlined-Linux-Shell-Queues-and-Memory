@@ -122,6 +122,50 @@ void read_tokens(char **argv, char *line, int *numTokens, char *delimiter)
     *numTokens = argc;
 }
 
+// TODO feature 3: File Redirection
+void fileRedirect(int argumentsCount, char *arguments[])
+{
+    // loop through all the arguments
+    //  check if there is any '<' or '>'
+    // if true, redirect the file to the stdin or stdout
+    for (int j = 0; j < argumentsCount; ++j)
+    {
+        // check have < ?
+        if (strcmp(arguments[j], "<") == 0)
+        {
+            // read the file
+            int fdInput = open(arguments[j + 1], O_RDONLY | S_IRUSR | S_IWUSR);
+
+            // redirect the file to the standard input
+            dup2(fdInput, STDIN_FILENO);
+            close(fdInput);
+
+            // remove '<'
+            arguments[j] = NULL;
+        }
+
+        // check have > ?
+        else if (strcmp(arguments[j], ">") == 0)
+        {
+            // write the file
+            int fdOutput = open(arguments[j + 1], O_CREAT | O_WRONLY | S_IRUSR | S_IWUSR);
+
+            // redirect the file to the standard output
+            dup2(fdOutput, STDOUT_FILENO);
+            close(fdOutput);
+
+            // remove '>'
+            arguments[j] = NULL;
+        }
+
+        // dont have < or > -> check next argument
+    }
+
+    // all arguments checked
+    // (</>) become null
+    // argv argv ... NULL... file names ... NULL... filenames
+}
+
 void process_cmd(char *command_line)
 {
     // Uncomment this line to check the cmdline content
@@ -134,129 +178,64 @@ void process_cmd(char *command_line)
     char *arguments[MAX_ARGUMENTS_PER_SEGMENT]; // character array buffer to store the arguments
     int argumentsCount;
     int pipeSegmentsCount;
-    int redirectionsCount;
 
     // phrase the command line
 
     // split the command line by pipe
     read_tokens(pipeSegments, command_line, &pipeSegmentsCount, PIPE_CHAR);
+    // last element of the array should be NULL
     pipeSegments[pipeSegmentsCount] = NULL;
 
-    // create a pipe
-    // cmd0 -> cmd1 -> cmd2 -> cmd3 -> cmd4 -> cmd5 -> cmd6 -> cmd7 (8 pipes segments)
-    //     pipe0   pipe1   pipe2   pipe3   pipe4   pipe5   pipe6 (7 pipes)
-    int pipefd[pipeSegmentsCount - 1][2];
-    // link and set up 7 pipes using a 2d array
-    //[0,0] [0,1] (pipe 0)
-    //[1,0] [1,1] (pipe 1)
-    //[2,0] [2,1] (pipe 2)
-    //[3,0] [3,1] (pipe 3)
-    //[4,0] [4,1] (pipe 4)
-    //[5,0] [5,1] (pipe 5)
-    //[6,0] [6,1] (pipe 6)
-    for (int i = 0; i < pipeSegmentsCount - 1; ++i)
-    {
-        if (pipe(pipefd[i]) < 0)
-        {
-            printf("pipe fails\n");
-            exit(1);
-        }
-    }
+    // create pipes
+    int prevPipeRead = -1;
+    int curPipe[2];  // current pipe
 
     // for each pipe segment split with space
     for (int i = 0; i < pipeSegmentsCount; ++i)
     {
-        // split the pipe segment with space -> get the arguments
+        // split the pipe segment with space/tabs -> get the arguments
         read_tokens(arguments, pipeSegments[i], &argumentsCount, SPACE_CHARS);
         arguments[argumentsCount] = NULL;
 
-        // fork a child process
+        // Create a pipe for the current segment if it's not the last segment
+        if (i != pipeSegmentsCount - 1)
+        {
+            pipe(curPipe);
+        }
+
+        // create a child process
         pid_t pid = fork();
 
-        if (pid < 0)
-        {
-            // fork fails
-            printf("fork fails\n");
-            exit(1);
-        }
-        else if (pid == 0)
+        if (pid == 0)
         {
             // child process
 
             // setup the redirections for pipes
             // if not the first pipe segment
-            if (i != 0)
+            if (prevPipeRead != -1)
             {
-                // redirect the standard input to the previous pipes
-                dup2(pipefd[i - 1][0], STDIN_FILENO); // redirect the previous pipe read end to stdin
-                //after the dup2, the original file descripter no longer needed
-                //=> close both end of the previous pipe
-                close(pipefd[i - 1][0]);
-                close(pipefd[i - 1][1]);
-                
+                // redirect the standard input to the previous pipe
+                dup2(prevPipeRead, STDIN_FILENO); // redirect the previous pipe read end to stdin
+                // after the dup2, the original file descriptor is no longer needed
+                close(prevPipeRead);
             }
 
             // if not the last pipe segment
             if (i != pipeSegmentsCount - 1)
             {
-                // redirect the standard output to the next pipe
-                dup2(pipefd[i][1], STDOUT_FILENO); // redirect the next pipe write end to stdout
-                // after dup2, original file descripter no longer needed
-                // => close both end of the next pipe
-                close(pipefd[i][0]);
-                close(pipefd[i][1]);
+                // redirect the standard output to the current pipe
+                dup2(curPipe[1], STDOUT_FILENO); // redirect the current pipe write end to stdout
+                // after dup2, the original file descriptor is no longer needed
+                close(curPipe[0]);
+                close(curPipe[1]);
             }
 
-            // TODO: feature 3: File Redirection
-            for (int j = 0; j < argumentsCount; ++j)
-            {
-                // input redirection
-                if (strcmp(arguments[j], "<") == 0)
-                {
-                    // read the file
-                    int fdInput = open(arguments[j + 1], O_RDONLY);
-
-                    // check successfull or not
-                    if (fdInput == -1)
-                    {
-                        printf("Error: Cannot open the file %s\n", arguments[j + 1]);
-                        exit(1);
-                    }
-
-                    // redirect the file to the standard input
-                    dup2(fdInput, STDIN_FILENO);
-                    close(fdInput);
-
-                    // remove '<'
-                    arguments[j] = NULL;
-                }
-
-                // output redirection
-                else if (strcmp(arguments[j], ">") == 0)
-                {
-                    // write the file
-                    int fdOutput = open(arguments[j + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
-
-                    // check successfull or not
-                    if (fdOutput == -1)
-                    {
-                        printf("Error: Cannot open the file %s\n", arguments[j + 1]);
-                        exit(1);
-                    }
-
-                    // redirect the file to the standard output
-                    dup2(fdOutput, STDOUT_FILENO);
-                    close(fdOutput);
-
-                    // remove '>'
-                    arguments[j] = NULL;
-                }
-            }
+            // file redirection
+            fileRedirect(argumentsCount, arguments);
 
             // execute the command
             // since (</>) has been become null
             // argv argv ... NULL... file names ... NULL... filenames
-            // the execvp only detect the argvs and end before the file names
             execvp(arguments[0], arguments);
 
             // execvp fails
@@ -265,15 +244,23 @@ void process_cmd(char *command_line)
         }
         else
         {
-            // parent process
-            // close the unused pipe
-            if (i != 0)
+            // Parent process
+
+            // Close the previous pipe's read end if it exists
+            if (prevPipeRead != -1)
             {
-                close(pipefd[i - 1][0]); //close read end of previous pipe
-                close(pipefd[i - 1][1]); //close write end of previous pipe
+                close(prevPipeRead);
             }
-            
-            // wait for the child process
+
+            // Move the current pipe's read end to prevPipeReadEnd for the next iteration
+            if (i != pipeSegmentsCount - 1)
+            {
+                prevPipeRead = curPipe[0];
+                // Close the current pipe's write end in the parent process
+                close(curPipe[1]);
+            }
+
+            // Wait for the child process
             wait(0);
         }
     }
@@ -322,20 +309,8 @@ int main()
             return 0; // exit the program
         }
 
-        pid_t pid = fork();
-        if (pid == 0)
-        {
-            // the child process handles the command
-            process_cmd(command_line);
+        process_cmd(command_line);
 
-            // ensure the child process terminates
-            exit(0);
-        }
-        else
-        {
-            // the parent process simply wait for the child and do nothing
-            wait(0);
-        }
     }
 
     return 0;
