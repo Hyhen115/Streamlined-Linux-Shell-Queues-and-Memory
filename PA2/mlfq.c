@@ -208,6 +208,15 @@ void print_parsed_values() {
     process_table_print(process_table, process_table_size);
 }
 
+/*
+int queue_num = 0;
+int process_table_size = 0;
+struct Process process_table[MAX_NUM_PROCESS];
+int time_quantum[MAX_NUM_QUEUE];
+*/
+
+
+
 // TODO: Implementation of MLFQ algorithm
 void mlfq() {
 
@@ -217,6 +226,109 @@ void mlfq() {
     // TODO: Write your code here to implement MLFQ
     // Tips: A simple array is good enough to implement a queue
 
+    // initialize the queue
+    struct Process queue1[MAX_NUM_PROCESS];
+    struct Process queue2[MAX_NUM_PROCESS];
+    struct Process queue3[MAX_NUM_PROCESS];
+    struct Process queueFCFS[MAX_NUM_PROCESS];
+
+    // index for each queue end
+    int q1Index = 0;
+    int q2Index = 0;
+    int q3Index = 0;
+    int qFCFSIndex = 0;
+
+    // index for each queue start
+    int q1Start = 0;
+    int q2Start = 0;
+    int q3Start = 0;
+    int qFCFSStart = 0;
+
+    // burst time left for each queue
+    int q1TimeLeft = 0;
+    int q2TimeLeft = 0;
+    int q3TimeLeft = 0;
+
+    // queue activation
+    int q1Active = 0;
+    int q2Active = 0;
+    int q3Active = 0;
+    // qFCFS must be actived
+
+    if (queue_num == 2) {
+        //2 queue -> q1 and qFCFS
+        q1Active = 1;
+    }
+    else if (queue_num == 3) {
+        //3 queue -> q1, q2 and qFCFS
+        q1Active = 1;
+        q2Active = 1;
+    }
+    else if (queue_num == 4) {
+        //4 queue -> q1, q2, q3 and qFCFS
+        q1Active = 1;
+        q2Active = 1;
+        q3Active = 1;
+    }
+
+    // total burst time add all burst time tgt
+    int totalBurstTime = 0;
+    for (int i = 0; i < process_table_size; i++) {
+        totalBurstTime += process_table[i].burst_time;
+    }
+
+    // current time set to 0
+    int curTime = 0;
+
+    // Scheduleing loop each loop 1 unit time
+    while (curTime < totalBurstTime) {
+
+        // check if there is any process arrived at the current time
+        // loop through all process
+        for (int i = 0; i < process_table_size; i++) {
+            // if the process arrived at the current time
+            // add the process to the queue
+            if (process_table[i].arrival_time == curTime) {
+                // add the process to first queue
+
+                // if only 1 queue -> FCFS
+                if (queue_num == 1) {
+                    queueFCFS[qFCFSIndex] = process_table[i];
+                    ++qFCFSIndex;
+                }
+                // if there are more than 1 queue -> add to queue1
+                else {
+                    // add to queue1
+                    queue1[q1Index] = process_table[i];
+                    ++q1Index;
+                }
+            }
+        }
+
+        //check queues, if the time quantum is 0 -> dont have this queue
+
+        //check queue1
+        if (time_quantum[0] > 0)
+        {
+
+        }
+
+        //check queue2
+        if (time_quantum[1] > 0)
+        {
+
+        }
+
+        //check queue3
+        if (time_quantum[2] > 0)
+        {
+
+        }
+
+        //check queueFCFS
+
+
+    }
 
 
 
