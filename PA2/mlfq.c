@@ -265,6 +265,8 @@ void mlfq()
     // TODO: Write your code here to implement MLFQ
     // Tips: A simple array is good enough to implement a queue
 
+    //! PROBLEM / CONFUSION: do i need to implement the FCFS? it said will input a large number and suppose it as FCFS
+
     // initialize the queue
     struct Process queue1[MAX_NUM_PROCESS];
     struct Process queue2[MAX_NUM_PROCESS];
