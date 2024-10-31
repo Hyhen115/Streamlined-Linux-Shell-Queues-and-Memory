@@ -243,7 +243,7 @@ void updateGanttChart(struct GanttChartItem *chart, int *sz_chart, struct Proces
     if (sz_chart > 0 && strcmp(chart[*sz_chart - 1].name, curProcess->name) == 0)
     {
         // add the 1 duration to the last process
-        ++chart[*sz_chart - 1].duration;
+        chart[*sz_chart - 1].duration += 1;
     }
     else
     {
@@ -251,7 +251,7 @@ void updateGanttChart(struct GanttChartItem *chart, int *sz_chart, struct Proces
         strcpy(chart[*sz_chart].name, curProcess->name);
         chart[*sz_chart].duration = 1;
         // increase the size of chart
-        ++*sz_chart;
+        *sz_chart += 1;
     }
 }
 
@@ -265,13 +265,11 @@ void mlfq()
     // TODO: Write your code here to implement MLFQ
     // Tips: A simple array is good enough to implement a queue
 
-    //! PROBLEM / CONFUSION: do i need to implement the FCFS? it said will input a large number and suppose it as FCFS
-
     // initialize the queue
-    struct Process queue1[MAX_NUM_PROCESS];
-    struct Process queue2[MAX_NUM_PROCESS];
-    struct Process queue3[MAX_NUM_PROCESS];
-    struct Process queue4[MAX_NUM_PROCESS];
+    struct Process *queue1[MAX_NUM_PROCESS];
+    struct Process *queue2[MAX_NUM_PROCESS];
+    struct Process *queue3[MAX_NUM_PROCESS];
+    struct Process *queue4[MAX_NUM_PROCESS];
 
     // index for each queue end
     int q1Index = 0;
@@ -290,6 +288,12 @@ void mlfq()
     int q2Time = 0;
     int q3Time = 0;
     int q4Time = 0;
+
+    // initilize the remain time for each process
+    for (int i = 0; i < process_table_size; i++)
+    {
+        process_table[i].remain_time = process_table[i].burst_time;
+    }
 
     // total burst time add all burst time tgt
     int totalBurstTime = 0;
@@ -314,14 +318,14 @@ void mlfq()
             if (process_table[i].arrival_time == curTime)
             {
                 // add the process to first queue
-                queue1[q1Index] = process_table[i];
+                queue1[q1Index] = &process_table[i];
                 ++q1Index;
             }
         }
 
         // queue1
         // if the queue1 time is greater than the time quantum of queue1
-        if (q1Time >= time_quantum[0])
+        if (q1Start < q1Index && q1Time >= time_quantum[0])
         {
             // add the process to the end of queue2
             queue2[q2Index] = queue1[q1Start];
@@ -333,7 +337,7 @@ void mlfq()
         }
 
         // queue2
-        if (q2Time >= time_quantum[1])
+        if (q2Start < q2Index && q2Time >= time_quantum[1])
         {
             // add the process to the end of queue3
             queue3[q3Index] = queue2[q2Start];
@@ -345,7 +349,7 @@ void mlfq()
         }
 
         // queue3
-        if (q3Time >= time_quantum[2])
+        if (q3Start < q3Index && q3Time >= time_quantum[2])
         {
             // add the process to the end of queue4
             queue4[q4Index] = queue3[q3Start];
@@ -359,59 +363,96 @@ void mlfq()
         // execute the process for 1 unit time each loop
         //  -> use if else if... to check which queue to execute
         //  check if the queue is empty or not
-        if (q1Start < q1Index)
-        {
+        if (q1Start < q1Index )
+        {   
             // queue1 is not empty
             // update the first process in queue1
-            queue1[q1Start].remain_time -= 1;
+            queue1[q1Start]->remain_time -= 1;
             // update the burst time of queue1
             q1Time += 1;
             // update the current time
             curTime += 1;
+            
             // update chart
-            updateGanttChart(chart, &sz_chart, &queue1[q1Start]);
+            updateGanttChart(chart, &sz_chart, queue1[q1Start]);
+
+            // if the process is finished
+            if (queue1[q1Start]->remain_time == 0)
+            {
+                // update the start of queue1
+                q1Start++;
+                q1Time = 0;
+                continue;
+            }
         }
         else if (q2Start < q2Index)
         {
             // queue2 is not empty
             // update the first process in queue2
-            queue2[q2Start].remain_time -= 1;
+            queue2[q2Start]->remain_time -= 1;
             // update the burst time of queue2
             q2Time += 1;
             // update the current time
             curTime += 1;
+
             // update chart
-            updateGanttChart(chart, &sz_chart, &queue2[q2Start]);
+            updateGanttChart(chart, &sz_chart, queue2[q2Start]);
+
+            // if the process is finished
+            if (queue2[q2Start]->remain_time == 0)
+            {
+                // update the start of queue2
+                q2Start++;
+                q2Time = 0;
+            }
         }
-        else if (q3Start < q3Index)
+        else if (q3Start < q3Index )
         {
             // queue3 is not empty
             // update the first process in queue3
-            queue3[q3Start].remain_time -= 1;
+            queue3[q3Start]->remain_time -= 1;
             // update the burst time of queue3
             q3Time += 1;
             // update the current time
             curTime += 1;
+
             // update chart
-            updateGanttChart(chart, &sz_chart, &queue3[q3Start]);
+            updateGanttChart(chart, &sz_chart, queue3[q3Start]);
+
+            // if the process is finished
+            if (queue3[q3Start]->remain_time == 0)
+            {
+                // update the start of queue3
+                q3Start++;
+                q3Time = 0;
+            }
         }
-        else if (q4Start < q4Index)
+        else if (q4Start < q4Index )
         {
             // queue4 is not empty
             // update the first process in queue4
-            queue4[q4Start].remain_time -= 1;
+            queue4[q4Start]->remain_time -= 1;
             // update the burst time of queue4
             q4Time += 1;
             // update the current time
             curTime += 1;
+
             // update chart
-            updateGanttChart(chart, &sz_chart, &queue4[q4Start]);
+            updateGanttChart(chart, &sz_chart, queue4[q4Start]);
+
+            // if the process is finished
+            if (queue4[q4Start]->remain_time == 0)
+            {
+                // update the start of queue4
+                q4Start++;
+                q4Time = 0;
+            }
         }
         else
         {
             // no process can be executed
             // increase the current time
-            curTime += 1;
+            curTime++;
         }
     }
 
@@ -426,3 +467,4 @@ int main()
     mlfq();
     return 0;
 }
+
