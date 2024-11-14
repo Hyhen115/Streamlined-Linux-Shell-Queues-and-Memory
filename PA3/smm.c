@@ -138,17 +138,137 @@ void mm_print()
 void *mm_malloc(size_t size)
 {
     // TODO: implement our own malloc function here
+    // First fit free block
+    
+    // current break of heap
+    void *curHeapBreak = mm_sbrk(0);
+    // current pointer
+    void *cur = heap_start;
+
+    // Loop through all the blocks
+    while (cur < curHeapBreak){
+        struct MetaData *metaDataPtr = (struct MetaData *)cur;
+        // check if the block is free
+        if(metaDataPtr->status == 'f'){
+            // check if the size of the block is enough to break
+            // ! dont support 0 size memory block
+            if(metaDataPtr->size > size + meta_data_size){
+                // able to split the block, to free block and occupied block
+
+                // make the new free block above
+                struct MetaData *newMetaDataPtr = (struct MetaData *)(cur + meta_data_size + size);
+                // set size of free block
+                newMetaDataPtr->size = metaDataPtr->size - size - meta_data_size;
+                // set status of free block
+                newMetaDataPtr->status = 'f';
+
+
+                // set size of occupied block
+                metaDataPtr->size = size;
+                // set status of occupied block
+                metaDataPtr->status = 'o';
+
+                // return the pointer of the memory of the occupied block
+                return (void *)(cur + meta_data_size);
+            }
+            else if (metaDataPtr->size >= size){
+                // the memory block is not enough to split, but enough to use
+                // waste some memory, use the block
+                metaDataPtr->status = 'o';
+                // return the data address (metadata + data)
+                return (void *)(cur + meta_data_size);
+            }
+        }
+
+        // move to the next block (next metadata position)
+        cur += meta_data_size + metaDataPtr->size;
+    }
+
+    // if no suitable block found
+    // extend the heap for the new block
+    void *newBlockPtr = mm_sbrk(size + meta_data_size);
+
+    // check if the heap has enough space to extend
+    if(newBlockPtr == MAP_FAILED){
+        // failed, cannot add allocate block
+        return NULL;
+    }
+
+    // allocate the block to the newly allocated memory
+    struct MetaData *newMetaDataPtr = (struct MetaData *)newBlockPtr;
+    // set the size of the block
+    newMetaDataPtr->size = size;
+    // set the status of the block
+    newMetaDataPtr->status = 'o';
+
+    return (void *)(newBlockPtr + meta_data_size);
+
     return NULL; // you should return a suitable address here
 }
 
 void mm_free(void *p)
 {
     // TODO: implement our own free function here
+    // if null ptr, do nth
+    if (p == NULL)
+        return;
+    
+    // allocate the address of the MetaData
+    struct MetaData *md = (struct MetaData *)((char *)0 - meta_data_size);
+
+    // check is the selected metaData is status occupied
+    // if occupied -> change the status to free
+    if(md->status == 'o'){
+        // change the status to free
+        md->status = 'f';
+    }
+
+    return;
 }
 
 void mm_combine_nearby_free()
 {
     // TODO: implement the algorithm to combine nearby free blocks
+    // current heap break
+    void *curHeapBreak = mm_sbrk(0);
+    // current pointer
+    void *cur = heap_start;
+
+    // Loop through all the blocks to find free blocks
+    while (cur < curHeapBreak)
+    {
+        // ptr point to current block
+        struct MetaData *metaDataPtr = (struct MetaData *)cur;
+
+        // check if the block is free
+        if(metaDataPtr->status == 'f'){
+            // check if the next block is free tilt encounters a occupied block
+            // ptr for pointing to next block
+            void *nextBlockPtr = cur + meta_data_size + metaDataPtr->size;
+            while(nextBlockPtr < curHeapBreak){
+                // ptr for pointing to the MetaData struct
+                struct MetaData *nextMetaDataPtr = (struct MetaData *)nextBlockPtr;
+
+                // check if the next block is free
+                if(nextMetaDataPtr->status == 'f'){
+                    // combine two free blocks
+                    // increase the size of the first block that is free by the size of the next free block
+                    metaDataPtr->size += meta_data_size + nextMetaDataPtr->size;
+
+                    // change next block pointer to the next block
+                    nextBlockPtr = cur + meta_data_size + metaDataPtr->size;
+                } else {
+                    // the next block is occupied
+                    // stop and break the loop
+                    break;
+                }
+                
+            }
+        }
+        // update cur pointer to next block
+        cur += meta_data_size + metaDataPtr->size;
+    }
+
 }
 
 int main()
