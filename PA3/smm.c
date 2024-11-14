@@ -139,6 +139,11 @@ void *mm_malloc(size_t size)
 {
     // TODO: implement our own malloc function here
     // First fit free block
+
+    // ensure size not 0, dont support 0 size memory block
+    if(size == 0){
+        return NULL;
+    }
     
     // current break of heap
     void *curHeapBreak = mm_sbrk(0);
@@ -202,8 +207,6 @@ void *mm_malloc(size_t size)
     newMetaDataPtr->status = 'o';
 
     return (void *)(newBlockPtr + meta_data_size);
-
-    return NULL; // you should return a suitable address here
 }
 
 void mm_free(void *p)
@@ -214,7 +217,7 @@ void mm_free(void *p)
         return;
     
     // allocate the address of the MetaData
-    struct MetaData *md = (struct MetaData *)((char *)0 - meta_data_size);
+    struct MetaData *md = (struct MetaData *)((char *)p - meta_data_size);
 
     // check is the selected metaData is status occupied
     // if occupied -> change the status to free
@@ -262,7 +265,7 @@ void mm_combine_nearby_free()
                     // stop and break the loop
                     break;
                 }
-                
+
             }
         }
         // update cur pointer to next block
