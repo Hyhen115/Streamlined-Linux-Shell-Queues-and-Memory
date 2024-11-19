@@ -4,3 +4,5 @@ Block 01: [OCCP] size =  300 bytes
 Block 01: [FREE] size =  300 bytes
 === malloc b 291 ===
 Block 01: [OCCP] size =  300 bytes
+=== free b ===
+Block 01: [FREE] size =  300 bytes

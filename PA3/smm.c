@@ -356,7 +356,7 @@ int main()
                     // As we only fill characters up to the block size,
                     // no meta data should be erased
                     for (j = 0; j < block_size; j++)
-                        target[i] = ' ';
+                        target[j] = ' ';
                 }
                 pointers[block_name - 'a'] = target;
                 printf("=== %s %c %ld ===\n", OPERATION_STR_MALLOC, block_name, block_size);
