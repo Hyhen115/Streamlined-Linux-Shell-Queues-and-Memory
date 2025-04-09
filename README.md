@@ -1,4 +1,3 @@
-# COMP3511
 ## PA1 Simplified Interactive Linux Shell
  a simplified linux shell that supports basic commands
   - Start / End of the shell
